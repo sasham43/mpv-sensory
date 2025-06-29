@@ -44,6 +44,8 @@ async function createMPVInstance() {
       '--save-position-on-quit',
       '--screen=1',
       '--fs=yes',
+      '--cache=yes',
+      '--cache-secs=20'
     ])
     process.stdout.on('data', (data) => {
       console.log(`stdout: ${data}`)
