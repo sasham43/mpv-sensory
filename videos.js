@@ -24,6 +24,7 @@ const VIDEOS = {
   Cliff: "sr-output.mp4",
   Lake: "lake-output.mp4",
   Plane: "plane-output.mp4",
+  Forest_River: "forest-river-output.mp4",
 };
 
 // ----------------- MPV Functions ------------------
@@ -49,6 +50,7 @@ async function createMPVInstance() {
       "--fs=yes",
       "--cache=yes",
       "--cache-secs=20",
+      "--loop",
     ]);
     process.stdout.on("data", (data) => {
       console.log(`stdout: ${data}`);
