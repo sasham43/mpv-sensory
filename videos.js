@@ -67,19 +67,26 @@ function sendMPVCommand(command) {
   mpv.write(msg);
 }
 
-function fadeToBlack(duration = 1.0) {
+// Combined fade out for video + audio
+async function fadeOutAll(duration = 1.0) {
   sendMPVCommand([
     "vf",
     "add",
     `fade=out:0:${Math.floor(duration * 60)}:0:0:0`,
   ]);
-  return new Promise((resolve) => setTimeout(resolve, (duration + 2) * 1000));
+  sendMPVCommand(["af", "add", `afade=out:0:${duration}`]);
+  return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
-function fadeFromBlack(duration = 1.0) {
+// Combined fade in for video + audio
+async function fadeInAll(duration = 1.0) {
+  // Clear previous filters
   sendMPVCommand(["vf", "clr", ""]);
+  sendMPVCommand(["af", "clr", ""]);
+
   sendMPVCommand(["vf", "add", `fade=in:0:${Math.floor(duration * 60)}:0:0:0`]);
-  return new Promise((resolve) => setTimeout(resolve, (duration + 2) * 1000));
+  sendMPVCommand(["af", "add", `afade=in:0:${duration}`]);
+  return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
 async function playVideo(path) {
@@ -89,12 +96,15 @@ async function playVideo(path) {
 
 async function transitionToVideo(newPath, fadeDuration = 1.0) {
   console.log(`Transitioning to ${newPath}`);
-  await fadeToBlack(fadeDuration);
-  console.log("faded to black");
+
+  await fadeOutAll(fadeDuration);
+  console.log("Faded out video and audio");
+
   await playVideo(newPath);
-  console.log("fade from black");
-  await fadeFromBlack(fadeDuration);
-  console.log("faded back in");
+  console.log("Loaded new video");
+
+  await fadeInAll(fadeDuration);
+  console.log("Faded in video and audio");
 }
 
 // ----------------- HTTP Server ------------------
@@ -107,57 +117,23 @@ async function startServer() {
     const { video } = req.body;
 
     if (!video || typeof video !== "string") {
-      return res.status(400).send({ error: "Invalid video path" });
+      return res.status(400).send({ error: "Invalid video name" });
     }
 
-    const isVideoFile = fs.existsSync(video);
-
-    const isVideoKey = Object.keys(VIDEOS).includes(video);
-
-    if (!isVideoFile && !isVideoKey) {
-      return res
-        .status(404)
-        .send({ error: `Video ${isVideoFile ? "file" : "key"} not found.` });
+    const videoPath = VIDEOS[video];
+    if (!videoPath) {
+      return res.status(404).send({ error: "Video not found" });
     }
 
-    try {
-      if (isVideoFile) {
-        await transitionToVideo(video);
-      } else if (isVideoKey) {
-        await transitionToVideo(`${VIDEOS_BASE_PATH}/${VIDEOS[video]}`);
-      }
-      res.send({ status: "ok", message: `Playing ${video}` });
-    } catch (err) {
-      console.error(err);
-      res.status(500).send({ error: "Failed to transition video" });
-    }
+    await transitionToVideo(`${VIDEOS_BASE_PATH}/${videoPath}`);
+    res.send({ status: "Playing", video });
   });
 
-  app.listen(PORT, () => {
-    console.log(`HTTP server listening on port ${PORT}`);
+  app.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
+    await createMPVInstance();
+    await connectToMPV();
   });
 }
 
-// ----------------- Entry Point ------------------
-
-(async () => {
-  if (!fs.existsSync(SOCKET_PATH)) {
-    console.error("MPV socket not found. Start mpv with:");
-    console.error(`mpv --idle=yes --input-ipc-server=${SOCKET_PATH}`);
-    process.exit(1);
-  }
-
-  try {
-    await createMPVInstance();
-    setTimeout(async () => {
-      await connectToMPV();
-    }, 1000);
-  } catch (e) {
-    console.error(e);
-  }
-
-  await startServer();
-
-  // Optional: Start with an initial video
-  // await playVideo('intro.mp4');
-})();
+startServer();
