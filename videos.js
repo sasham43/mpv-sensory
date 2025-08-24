@@ -15,12 +15,14 @@ const VIDEOS = {
   Waterfall: 'waterfall-output.mp4',
   Train_Montenegro: 'tr-output.mp4',
   Train_Norway: 'tr-winter.mp4',
-  Train_Japan_Winter: 'jp-train-output.mp4',
-  Train_Japan_Summer: 'jp-train.webm',
+  Train_Japan_Winter: 'jp-train-output-2.mp4',
+  Train_Japan_Summer: 'jp-train-output.mp4',
   Cosmos: 'cosmos-output.mp4',
   Aquarium: 'aquarium-output.mp4',
   Beach: 'beach-output.mp4',
-  Jungle: 'junge-rain.mp4',
+  Jungle: 'rain-output-2.mp4',
+  Lake: 'lake-output.mp4',
+  Forest_River: 'forest-river-output.mp4'
 }
 
 // ----------------- MPV Functions ------------------
