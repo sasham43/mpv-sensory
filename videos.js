@@ -71,12 +71,12 @@ function sendMPVCommand(command) {
 
 // Combined fade out for video + audio
 async function fadeOutAll(duration = 1.0) {
+  sendMPVCommand(["af", "add", `afade=out:0:${duration}`]);
   sendMPVCommand([
     "vf",
     "add",
     `fade=out:0:${Math.floor(duration * 60)}:0:0:0`,
   ]);
-  sendMPVCommand(["af", "add", `afade=out:0:${duration}`]);
   return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
@@ -86,8 +86,8 @@ async function fadeInAll(duration = 1.0) {
   sendMPVCommand(["vf", "clr", ""]);
   sendMPVCommand(["af", "clr", ""]);
 
-  sendMPVCommand(["vf", "add", `fade=in:0:${Math.floor(duration * 60)}:0:0:0`]);
   sendMPVCommand(["af", "add", `afade=in:0:${duration}`]);
+  sendMPVCommand(["vf", "add", `fade=in:0:${Math.floor(duration * 60)}:0:0:0`]);
   return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
