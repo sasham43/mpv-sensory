@@ -1,156 +1,139 @@
-const net = require('net')
-const fs = require('fs')
-const express = require('express')
-const bodyParser = require('body-parser')
-const child_process = require('child_process')
+const net = require("net");
+const fs = require("fs");
+const express = require("express");
+const bodyParser = require("body-parser");
+const child_process = require("child_process");
 
-const SOCKET_PATH = '/tmp/mpv-socket' // adjust if on Windows
-const PORT = 3000
+const SOCKET_PATH = "/tmp/mpv-socket"; // adjust if on Windows
+const PORT = 3000;
 
-let mpv
+let mpv;
 
-const VIDEOS_BASE_PATH = '/Volumes/S_Drive/ambient-DRIVE'
+const VIDEOS_BASE_PATH = "/Volumes/S_Drive/ambient-DRIVE";
 
 const VIDEOS = {
-  Waterfall: 'waterfall-output.mp4',
-  Train_Montenegro: 'tr-output.mp4',
-  Train_Norway: 'tr-winter.mp4',
-  Train_Japan_Winter: 'jp-train-output-2.mp4',
-  Train_Japan_Summer: 'jp-train-output.mp4',
-  Cosmos: 'cosmos-output.mp4',
-  Aquarium: 'aquarium-output.mp4',
-  Beach: 'beach-output.mp4',
-  Jungle: 'rain-output-2.mp4',
-  Lake: 'lake-output.mp4',
-  Forest_River: 'forest-river-output.mp4'
-}
+  Waterfall: "waterfall-output.mp4",
+  Train_Montenegro: "tr-output.mp4",
+  Train_Norway: "tr-winter.mp4",
+  Train_Japan_Winter: "jp-train-output-2.mp4",
+  Train_Japan_Summer: "jp-train-output.mp4",
+  Cosmos: "cosmos-output.mp4",
+  Aquarium: "aquarium-output.mp4",
+  Beach: "beach-output.mp4",
+  Jungle: "rain-output-2.mp4",
+  Cliff: "sr-output.mp4",
+  Lake: "lake-output.mp4",
+  Plane: "plane-output.mp4",
+  Forest_River: "forest-river-output.mp4",
+};
 
 // ----------------- MPV Functions ------------------
 
 function connectToMPV() {
   return new Promise((resolve, reject) => {
     const client = net.createConnection(SOCKET_PATH, () => {
-      console.log('Connected to MPV socket')
-      mpv = client
-      resolve(client)
-    })
-    client.on('error', reject)
-  })
+      console.log("Connected to MPV socket");
+      mpv = client;
+      resolve(client);
+    });
+    client.on("error", reject);
+  });
 }
 
 async function createMPVInstance() {
   return new Promise((resolve, reject) => {
-    const process = child_process.spawn('mpv', [
+    const process = child_process.spawn("mpv", [
       `--idle=yes`,
       `--input-ipc-server=${SOCKET_PATH}`,
-      '--save-position-on-quit',
-      '--screen=1',
-      '--fs=yes',
-      '--cache=yes',
-      '--cache-secs=20'
-    ])
-    process.stdout.on('data', (data) => {
-      console.log(`stdout: ${data}`)
-    })
-    process.stderr.on('data', (data) => {
-      console.error(`stderr: ${data}`)
-    })
-    resolve(process)
-  })
+      "--save-position-on-quit",
+      "--screen=1",
+      "--fs=yes",
+      "--cache=yes",
+      "--cache-secs=20",
+      "--loop",
+    ]);
+    process.stdout.on("data", (data) => {
+      console.log(`stdout: ${data}`);
+    });
+    process.stderr.on("data", (data) => {
+      console.error(`stderr: ${data}`);
+    });
+    resolve(process);
+  });
 }
 
 function sendMPVCommand(command) {
-  const msg = JSON.stringify({ command }) + '\n'
-  mpv.write(msg)
+  const msg = JSON.stringify({ command }) + "\n";
+  mpv.write(msg);
 }
 
-function fadeToBlack(duration = 1.0) {
-  sendMPVCommand(['vf', 'add', `fade=out:0:${Math.floor(duration * 60)}:0:0:0`])
-  return new Promise((resolve) => setTimeout(resolve, (duration + 2) * 1000))
+// Combined fade out for video + audio
+async function fadeOutAll(duration = 1.0) {
+  sendMPVCommand([
+    "vf",
+    "add",
+    `fade=out:0:${Math.floor(duration * 60)}:0:0:0`,
+  ]);
+  sendMPVCommand(["af", "add", `afade=out:0:${duration}`]);
+  return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
-function fadeFromBlack(duration = 1.0) {
-  sendMPVCommand(['vf', 'clr', ''])
-  sendMPVCommand(['vf', 'add', `fade=in:0:${Math.floor(duration * 60)}:0:0:0`])
-  return new Promise((resolve) => setTimeout(resolve, (duration + 2) * 1000))
+// Combined fade in for video + audio
+async function fadeInAll(duration = 1.0) {
+  // Clear previous filters
+  sendMPVCommand(["vf", "clr", ""]);
+  sendMPVCommand(["af", "clr", ""]);
+
+  sendMPVCommand(["vf", "add", `fade=in:0:${Math.floor(duration * 60)}:0:0:0`]);
+  sendMPVCommand(["af", "add", `afade=in:0:${duration}`]);
+  return new Promise((resolve) => setTimeout(resolve, (duration + 0.2) * 1000));
 }
 
 async function playVideo(path) {
-  sendMPVCommand(['loadfile', path, 'replace'])
-  return new Promise((resolve) => setTimeout(resolve, 500))
+  sendMPVCommand(["loadfile", path, "replace"]);
+  return new Promise((resolve) => setTimeout(resolve, 500));
 }
 
 async function transitionToVideo(newPath, fadeDuration = 1.0) {
-  console.log(`Transitioning to ${newPath}`)
-  await fadeToBlack(fadeDuration)
-  console.log('faded to black')
-  await playVideo(newPath)
-  console.log('fade from black')
-  await fadeFromBlack(fadeDuration)
-  console.log('faded back in')
+  console.log(`Transitioning to ${newPath}`);
+
+  await fadeOutAll(fadeDuration);
+  console.log("Faded out video and audio");
+
+  await playVideo(newPath);
+  console.log("Loaded new video");
+
+  await fadeInAll(fadeDuration);
+  console.log("Faded in video and audio");
 }
 
 // ----------------- HTTP Server ------------------
 
 async function startServer() {
-  const app = express()
-  app.use(bodyParser.json())
+  const app = express();
+  app.use(bodyParser.json());
 
-  app.post('/play', async (req, res) => {
-    const { video } = req.body
+  app.post("/play", async (req, res) => {
+    const { video } = req.body;
 
-    if (!video || typeof video !== 'string') {
-      return res.status(400).send({ error: 'Invalid video path' })
+    if (!video || typeof video !== "string") {
+      return res.status(400).send({ error: "Invalid video name" });
     }
 
-    const isVideoFile = fs.existsSync(video)
-
-    const isVideoKey = Object.keys(VIDEOS).includes(video)
-
-    if (!isVideoFile && !isVideoKey) {
-      return res
-        .status(404)
-        .send({ error: `Video ${isVideoFile ? 'file' : 'key'} not found.` })
+    const videoPath = VIDEOS[video];
+    if (!videoPath) {
+      return res.status(404).send({ error: "Video not found" });
     }
 
-    try {
-      if (isVideoFile) {
-        await transitionToVideo(video)
-      } else if (isVideoKey) {
-        await transitionToVideo(`${VIDEOS_BASE_PATH}/${VIDEOS[video]}`)
-      }
-      res.send({ status: 'ok', message: `Playing ${video}` })
-    } catch (err) {
-      console.error(err)
-      res.status(500).send({ error: 'Failed to transition video' })
-    }
-  })
+    await transitionToVideo(`${VIDEOS_BASE_PATH}/${videoPath}`);
+    res.send({ status: "Playing", video });
+  });
 
-  app.listen(PORT, () => {
-    console.log(`HTTP server listening on port ${PORT}`)
-  })
+  app.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
+    await createMPVInstance();
+    await connectToMPV();
+  });
 }
 
-// ----------------- Entry Point ------------------
-
-;(async () => {
-  if (!fs.existsSync(SOCKET_PATH)) {
-    console.error('MPV socket not found. Start mpv with:')
-    console.error(`mpv --idle=yes --input-ipc-server=${SOCKET_PATH}`)
-    process.exit(1)
-  }
-
-  try {
-    await createMPVInstance()
-    setTimeout(async () => {
-      await connectToMPV()
-    }, 1000)
-  } catch (e) {
-    console.error(e)
-  }
-
-  await startServer()
-
-  // Optional: Start with an initial video
-  // await playVideo('intro.mp4');
-})()
+startServer();
