@@ -25,6 +25,8 @@ const VIDEOS = {
   Lake: "lake-output.mp4",
   Plane: "plane-output.mp4",
   Forest_River: "forest-river-output.mp4",
+  Meadow: "meadow3-output.mp4",
+  Lake: "lake2-output.mp4",
 };
 
 // ----------------- MPV Functions ------------------
