@@ -116,7 +116,7 @@ async function startServer() {
   app.post("/play", async (req, res) => {
     const { video } = req.body;
 
-    console.log("video input received:")
+    console.log("video input received:", video)
 
     if (!video || typeof video !== "string") {
       return res.status(400).send({ error: "Invalid video name" });
